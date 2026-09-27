@@ -72,6 +72,20 @@
   .sw input:checked + i { background:#1a7f4b; }
   .sw input:checked + i:before { transform:translateX(20px); }
   .bfdot { position:absolute; bottom:4px; right:4px; width:5px; height:5px; border-radius:50%; background:#b9770e; }
+  /* 打卡界面改版 */
+  .pcard { background:linear-gradient(135deg,#1e8f55,#14633c); color:#fff; border-radius:14px; padding:16px; margin-top:12px; box-shadow:0 2px 6px rgba(26,127,75,.25); }
+  .pcard .pt { font-size:17px; font-weight:700; }
+  .pcard .ps { font-size:12px; opacity:.85; margin-top:5px; }
+  .pbar { background:rgba(255,255,255,.25); border-radius:6px; height:8px; margin-top:12px; overflow:hidden; }
+  .pbar i { display:block; height:100%; background:#fff; border-radius:6px; transition:width .4s; }
+  .itcard { background:#fff; border-radius:14px; padding:14px; margin-top:12px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  .itcard .ithead { display:flex; justify-content:space-between; align-items:center; }
+  .itcard .nm { font-weight:600; font-size:16px; }
+  .itcard .ds { font-size:12px; color:#6a737d; margin-top:3px; }
+  .chip { display:inline-block; background:#e8f5ee; color:#1a7f4b; font-size:12px; border-radius:8px; padding:5px 9px; margin:9px 6px 0 0; }
+  .ckbtn { display:block; width:100%; border:none; border-radius:12px; padding:15px; font-size:17px; font-weight:700; background:#1a7f4b; color:#fff; margin-top:12px; cursor:pointer; letter-spacing:1px; }
+  .ckbtn:active { transform:scale(.985); }
+  .ckdone { margin-top:12px; background:#e8f5ee; color:#1a7f4b; border-radius:12px; padding:14px; text-align:center; font-weight:600; font-size:15px; }
 </style>
 </head>
 <body>
@@ -114,6 +128,7 @@
     <div class="banner" id="remind-banner"></div>
 
     <div id="sec-client">
+      <div class="pcard" id="pcard"></div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <b id="today-title">今日打卡</b>
@@ -181,7 +196,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_0jyqr69z3rzlLlGi4mO4NQ_zNfdxd-h";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const TZ = 'Asia/Shanghai';
 const $ = id => document.getElementById(id);
-let ME = null, ITEMS = [], TODAY_CK = [], CAL_M = new Date(), OV_D = new Date(), ST_M = new Date();
+let ME = null, ITEMS = [], TODAY_CK = [], MONTH_CK = [], CAL_M = new Date(), OV_D = new Date(), ST_M = new Date();
 let ADMIN_TARGET = null, REMIND_TIMER = null;
 
 function todayStr(d) {
@@ -255,25 +270,55 @@ async function logout() { await sb.auth.signOut(); location.reload(); }
 async function loadClient() {
   const { data: items } = await sb.from('items').select('*').eq('user_id', ME.id).order('created_at');
   ITEMS = items || [];
-  const { data: cks } = await sb.from('checkins').select('*').eq('user_id', ME.id).eq('check_date', todayStr());
-  TODAY_CK = cks || [];
+  const start = fmtD(new Date(Date.now() - 60 * 86400000));
+  const { data: cks } = await sb.from('checkins').select('*').eq('user_id', ME.id).gte('check_date', start).lte('check_date', todayStr());
+  MONTH_CK = cks || [];
+  TODAY_CK = MONTH_CK.filter(c => c.check_date === todayStr());
   renderToday();
   renderCal();
 }
+function calcStreak() {
+  const totalPerDay = ITEMS.reduce((s, i) => s + i.times_per_day, 0);
+  if (!totalPerDay) return 0;
+  const cnt = ds => MONTH_CK.filter(c => c.check_date === ds).length;
+  const t = todayStr();
+  let cur = new Date();
+  if (cnt(t) < totalPerDay) cur.setDate(cur.getDate() - 1);
+  let streak = 0;
+  while (cnt(fmtD(cur)) >= totalPerDay && streak < 365) { streak++; cur.setDate(cur.getDate() - 1); }
+  return streak;
+}
 function renderToday() {
   $('today-date').textContent = todayStr() + ' ' + ['周日','周一','周二','周三','周四','周五','周六'][new Date().getDay()];
+  const total = ITEMS.reduce((s, i) => s + i.times_per_day, 0);
+  const done = Math.min(TODAY_CK.length, total);
+  const streak = calcStreak();
+  // 顶部进度卡
+  const pc = $('pcard');
+  if (!ITEMS.length) pc.innerHTML = '<div class="pt">开始你的第一天 ✓</div><div class="ps">先添加一个要打卡的东西，就可以每天打卡了</div>';
+  else if (total && done >= total) pc.innerHTML = '<div class="pt">🎉 今日已全部完成</div><div class="ps">已坚持 ' + streak + ' 天，继续保持！</div><div class="pbar"><i style="width:100%"></i></div>';
+  else pc.innerHTML = '<div class="pt">今日进度 ' + done + ' / ' + total + '</div><div class="ps">还差 ' + (total - done) + ' 次，点下方按钮打卡</div><div class="pbar"><i style="width:' + (total ? Math.round(done / total * 100) : 0) + '%"></i></div>';
   const el = $('today-list');
-  if (!ITEMS.length) { el.innerHTML = '<div style="padding:16px 0;text-align:center;color:#6a737d;font-size:13px;">还没有品类，点下方「添加品类」开始</div>'; return; }
+  if (!ITEMS.length) {
+    el.innerHTML = '<button class="ckbtn" onclick="openAddItem()">＋ 添加要打卡的东西</button>'
+      + '<div style="text-align:center;color:#6a737d;font-size:13px;margin-top:10px;">第一次用？添加名称后每天一键打卡</div>';
+    return;
+  }
   el.innerHTML = ITEMS.map(it => {
-    const slots = [];
+    const doneChips = [];
+    let next = null;
     for (let s = 1; s <= it.times_per_day; s++) {
       const ck = TODAY_CK.find(c => c.item_id === it.id && c.slot === s);
-      slots.push(ck
-        ? '<button class="slot done">第' + s + '次 ✓<span class="tm">' + fmtDT(ck.created_at).slice(-5) + (ck.is_admin_backfill ? ' 补' : '') + '</span></button>'
-        : '<button class="slot" onclick="checkin(\'' + it.id + '\',' + s + ')">第' + s + '次</button>');
+      if (ck) doneChips.push('<span class="chip">✓ 第' + s + '次 ' + fmtDT(ck.created_at).slice(-5) + (ck.is_admin_backfill ? ' 补' : '') + '</span>');
+      else if (next === null) next = s;
     }
-    return '<div class="item"><div><div class="nm">' + esc(it.name) + '</div><div class="ds">每天' + it.times_per_day + '次 × ' + esc(it.dose) + (it.remind_time ? ' · 提醒 ' + it.remind_time : '') + '</div></div>'
-      + '<div style="display:flex;gap:6px;align-items:center;">' + slots.join('') + '<button class="mini" onclick="itemMenu(\'' + it.id + '\')">⋯</button></div></div>';
+    const action = next
+      ? '<button class="ckbtn" onclick="checkin(\'' + it.id + '\',' + next + ')">打卡 · 第 ' + next + ' 次</button>'
+      : '<div class="ckdone">✓ 今日已完成</div>';
+    return '<div class="itcard"><div class="ithead"><span class="nm">' + esc(it.name) + '</span><button class="mini" onclick="itemMenu(\'' + it.id + '\')">⋯ 管理</button></div>'
+      + '<div class="ds">每天' + it.times_per_day + '次 × ' + esc(it.dose) + (it.remind_time ? ' · 提醒 ' + it.remind_time : '') + '</div>'
+      + (doneChips.length ? '<div>' + doneChips.join('') + '</div>' : '')
+      + action + '</div>';
   }).join('');
 }
 async function checkin(itemId, slot) {
@@ -357,21 +402,7 @@ async function renderCal() {
     else html += '<div class="c ' + cls + '">' + d + '</div>';
   }
   $('cal').innerHTML = html;
-  // 连续打卡：从今天（或昨天）往前数全打的天数
-  let streak = 0;
-  const daySet = new Set(ck.map(c => c.check_date));
-  let cur = new Date();
-  if (totalPerDay > 0) {
-    if (!daySet.has(todayStr())) cur.setDate(cur.getDate() - 1);
-    while (true) {
-      let ok = true;
-      for (let s = 0; s < totalPerDay; s++) { /* 全打判断按记录数 */ }
-      if (!daySet.has(fmtD(cur)) || fmtD(cur) > t) break;
-      const dcks = ck.filter(c => c.check_date === fmtD(cur));
-      if (dcks.length < totalPerDay) break;
-      streak++; cur.setDate(cur.getDate() - 1);
-    }
-  }
+  const streak = calcStreak();
   $('st-streak').textContent = streak;
   $('st-month').textContent = monthTotal ? Math.round(monthDone / monthTotal * 100) + '%' : '—';
   $('st-cnt').textContent = monthDone;
