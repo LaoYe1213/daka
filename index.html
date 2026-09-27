@@ -71,6 +71,7 @@
   .sw i:before { content:""; position:absolute; width:18px; height:18px; border-radius:50%; background:#fff; top:3px; left:3px; transition:.2s; }
   .sw input:checked + i { background:#1a7f4b; }
   .sw input:checked + i:before { transform:translateX(20px); }
+  .bfdot { position:absolute; bottom:4px; right:4px; width:5px; height:5px; border-radius:50%; background:#b9770e; }
 </style>
 </head>
 <body>
@@ -432,44 +433,80 @@ async function renderOverview() {
 }
 function ovNav(d) { OV_D.setDate(OV_D.getDate() + d); renderOverview(); }
 
+let UD = null;
 async function userDetail(uid) {
-  ADMIN_TARGET = uid;
-  const [{ data: u }, { data: its }, { data: cks }] = await Promise.all([
+  const [{ data: u }, { data: its }] = await Promise.all([
     sb.from('profiles').select('*').eq('id', uid).single(),
-    sb.from('items').select('*').eq('user_id', uid).order('created_at'),
-    sb.from('checkins').select('*').eq('user_id', uid).gte('check_date', fmtD(new Date(new Date().getFullYear(), new Date().getMonth(), 1))).lte('check_date', todayStr())
+    sb.from('items').select('*').eq('user_id', uid).order('created_at')
   ]);
-  const monthCks = cks || [];
-  const doneThisMonth = monthCks.length;
-  const totalPerDay = its.reduce((s, i) => s + i.times_per_day, 0);
-  const daysSoFar = new Date().getDate();
-  const rate = totalPerDay ? Math.min(100, Math.round(doneThisMonth / (totalPerDay * daysSoFar) * 100)) : 0;
+  UD = { uid: uid, u: u, items: its || [], month: new Date(), cks: [], missing: [] };
   openModal('<h3>' + esc(u.name) + ' <span style="font-size:12px;color:#6a737d;font-weight:400;">' + u.phone + (u.active ? '' : ' · 已停用') + '</span></h3>'
-    + '<div class="stat"><div><b>' + rate + '%</b><span>本月完卡率</span></div><div><b>' + doneThisMonth + '</b><span>本月打卡次数</span></div></div>'
-    + '<label style="margin-top:14px;">补卡（仅管理员可用）</label>'
-    + '<select id="bf-item">' + its.map(i => '<option value="' + i.id + '" data-dose="' + esc(i.dose) + '" data-times="' + i.times_per_day + '">' + esc(i.name) + '（每天' + i.times_per_day + '次）</option>').join('') + '</select>'
-    + '<div class="row"><div><label>日期</label><input id="bf-date" type="date" value="' + todayStr() + '"></div>'
-    + '<div><label>第几次</label><input id="bf-slot" type="number" min="1" max="9" value="1"></div></div>'
-    + '<label>补卡原因（可选）</label><input id="bf-reason" placeholder="如：出差忘带">'
-    + '<button class="btn btn-p" style="margin-top:12px;" onclick="doBackfill()">确认补卡</button>'
-    + '<div class="msg" style="display:none" id="bf-msg"></div>'
-    + '<div style="margin-top:16px;"><b style="font-size:13px;">最近记录（本月 ' + doneThisMonth + ' 条）</b><div class="det">' + monthCks.slice().reverse().slice(0, 15).map(c => fmtD(new Date(c.check_date)) + ' 第' + c.slot + '次' + (c.is_admin_backfill ? ' · 补录' + (c.backfill_reason ? '：' + esc(c.backfill_reason) : '') : '')).join('<br>') + '</div></div>'
+    + '<div class="det" id="ud-stat"></div>'
+    + '<div class="mnav" style="margin-top:8px;"><button onclick="udNav(-1)">‹ 上月</button><b id="ud-title"></b><button onclick="udNav(1)">下月 ›</button></div>'
+    + '<div class="cal" id="ud-cal"></div>'
+    + '<div class="det">绿色=当天全打完 · 无色=没打完 · 角上小点=含补录 · 点日期可补卡</div>'
     + '<div class="row" style="margin-top:14px;">'
     + '<button class="btn btn-s" onclick="resetPwd(\'' + uid + '\')">重置密码</button>'
     + '<button class="btn ' + (u.active ? 'btn-d' : 'btn-s') + '" onclick="toggleActive(\'' + uid + '\',' + u.active + ')">' + (u.active ? '停用账号' : '启用账号') + '</button></div>');
+  renderUdCal();
 }
-async function doBackfill() {
-  const sel = $('bf-item');
-  const item = sel.options[sel.selectedIndex];
+function udNav(d) { UD.month.setMonth(UD.month.getMonth() + d); renderUdCal(); }
+async function renderUdCal() {
+  const y = UD.month.getFullYear(), m = UD.month.getMonth();
+  $('ud-title').textContent = y + '年' + (m + 1) + '月';
+  const start = fmtD(new Date(y, m, 1)), end = fmtD(new Date(y, m + 1, 0));
+  const { data: cks } = await sb.from('checkins').select('*').eq('user_id', UD.uid).gte('check_date', start).lte('check_date', end);
+  UD.cks = cks || [];
+  const total = UD.items.reduce((s, i) => s + i.times_per_day, 0);
+  const isCur = (y === new Date().getFullYear() && m === new Date().getMonth());
+  const daysCnt = isCur ? new Date().getDate() : new Date(y, m + 1, 0).getDate();
+  const rate = total ? Math.min(100, Math.round(UD.cks.length / (total * daysCnt) * 100)) : 0;
+  $('ud-stat').textContent = '完卡率 ' + (total ? rate + '%' : '—') + ' · 打卡 ' + UD.cks.length + ' 次（含补录 ' + UD.cks.filter(c => c.is_admin_backfill).length + ' 次）';
+  let html = ['日','一','二','三','四','五','六'].map(w => '<div class="c hd">' + w + '</div>').join('');
+  const first = new Date(y, m, 1).getDay();
+  for (let i = 0; i < first; i++) html += '<div class="c"></div>';
+  const days = new Date(y, m + 1, 0).getDate();
+  const tstr = todayStr();
+  for (let d = 1; d <= days; d++) {
+    const ds = fmtD(new Date(y, m, d));
+    const dc = UD.cks.filter(c => c.check_date === ds);
+    const full = total > 0 && dc.length >= total;
+    const hasBf = dc.some(c => c.is_admin_backfill);
+    let cls = (full ? 'g' : '') + (ds === tstr ? ' tdy' : '');
+    html += '<div class="c ' + cls + '" style="cursor:pointer;" onclick="udDay(\'' + ds + '\')">' + d + (hasBf ? '<span class="bfdot"></span>' : '') + '</div>';
+  }
+  $('ud-cal').innerHTML = html;
+}
+function udDay(ds) {
+  const total = UD.items.reduce((s, i) => s + i.times_per_day, 0);
+  const dc = UD.cks.filter(c => c.check_date === ds);
+  if (!UD.items.length) { alert('该用户还没有添加品类，无法补卡'); return; }
+  if (total > 0 && dc.length >= total) {
+    openModal('<h3>' + ds + ' · 打卡记录</h3><div class="det">'
+      + dc.map(c => { const it = UD.items.find(i => i.id === c.item_id); return (it ? esc(it.name) : '?') + ' · 第' + c.slot + '次 · ' + fmtDT(c.created_at) + (c.is_admin_backfill ? ' · 补录' + (c.backfill_reason ? '（' + esc(c.backfill_reason) + '）' : '') : ''); }).join('<br>')
+      + '</div><button class="btn btn-s" style="margin-top:14px;" onclick="closeModal()">关闭</button>');
+    return;
+  }
+  const missing = [];
+  UD.items.forEach(it => { for (let s = 1; s <= it.times_per_day; s++) if (!dc.find(c => c.item_id === it.id && c.slot === s)) missing.push({ item: it, slot: s }); });
+  UD.missing = missing;
+  openModal('<h3>' + ds + ' · 补卡</h3><div class="det">该日已打 ' + dc.length + '/' + total + '，还缺 ' + missing.length + ' 次</div>'
+    + '<label>补哪一次</label><select id="bf-miss">'
+    + missing.map((mo, idx) => '<option value="' + idx + '">' + esc(mo.item.name) + ' · 第' + mo.slot + '次 · ' + esc(mo.item.dose) + '</option>').join('')
+    + '</select>'
+    + '<label>补卡原因（可选）</label><input id="bf-reason" placeholder="如：出差忘带">'
+    + '<button class="btn btn-p" style="margin-top:14px;" onclick="doBackfill(\'' + ds + '\')">确认补卡</button>'
+    + '<div class="msg hide" id="bf-msg"></div>'
+    + '<button class="btn btn-s" style="margin-top:8px;" onclick="closeModal()">取消</button>');
+}
+async function doBackfill(ds) {
+  const mo = UD.missing[parseInt($('bf-miss').value)];
   const { error } = await sb.from('checkins').insert({
-    user_id: ADMIN_TARGET, item_id: sel.value,
-    check_date: $('bf-date').value, slot: parseInt($('bf-slot').value) || 1,
-    dose: item.dataset.dose, is_admin_backfill: true, backfill_reason: $('bf-reason').value.trim() || null
+    user_id: UD.uid, item_id: mo.item.id, check_date: ds, slot: mo.slot,
+    dose: mo.item.dose, is_admin_backfill: true, backfill_reason: $('bf-reason').value.trim() || null
   });
-  const bm = $('bf-msg');
-  bm.style.display = 'block';
-  if (error) { bm.className = 'msg msg-err'; bm.textContent = '补卡失败：' + error.message; }
-  else { bm.className = 'msg msg-ok'; bm.textContent = '补卡成功'; renderOverview(); }
+  if (error) { const bm = $('bf-msg'); bm.className = 'msg msg-err'; bm.style.display = 'block'; bm.textContent = '补卡失败：' + error.message; return; }
+  closeModal(); renderUdCal(); renderOverview();
 }
 async function resetPwd(uid) {
   const np = prompt('输入新密码（至少6位）：');
