@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>每日打卡</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:"PingFang SC","Microsoft YaHei",sans-serif; background:#f2f4f7; color:#24292f; min-height:100vh; font-size:15px; }
+  .wrap { max-width:480px; margin:0 auto; padding:14px 14px 40px; }
+  .hide { display:none !important; }
+  h1 { font-size:19px; font-weight:600; }
+  .card { background:#fff; border-radius:14px; padding:14px; margin-top:12px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  .btn { display:block; width:100%; border:none; border-radius:10px; padding:12px; font-size:16px; font-weight:600; cursor:pointer; }
+  .btn-p { background:#1a7f4b; color:#fff; }
+  .btn-p:disabled { background:#9cc9b0; }
+  .btn-s { background:#eef1f4; color:#24292f; font-weight:400; }
+  .btn-d { background:#fdecec; color:#c0392b; font-weight:400; }
+  input, select { width:100%; border:1px solid #d5dae0; border-radius:9px; padding:11px 12px; font-size:15px; margin-top:8px; background:#fff; color:#24292f; }
+  input:focus { outline:none; border-color:#1a7f4b; }
+  label { display:block; font-size:13px; color:#6a737d; margin-top:10px; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+  .msg { padding:10px 12px; border-radius:9px; font-size:13px; margin-top:10px; }
+  .msg-err { background:#fdecec; color:#c0392b; }
+  .msg-ok { background:#e8f5ee; color:#1a7f4b; }
+  .hdr { display:flex; align-items:center; justify-content:space-between; padding:4px 2px 0; }
+  .hdr .who { font-size:13px; color:#6a737d; }
+  .hdr .lk { color:#1a7f4b; font-size:13px; cursor:pointer; border:none; background:none; padding:6px; }
+  .item { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eef1f4; }
+  .item:last-child { border-bottom:none; }
+  .item .nm { font-weight:600; font-size:15px; }
+  .item .ds { font-size:12px; color:#6a737d; margin-top:2px; }
+  .slot { border:1.5px solid #1a7f4b; color:#1a7f4b; background:#fff; border-radius:9px; padding:8px 13px; font-size:13px; font-weight:600; cursor:pointer; min-width:64px; }
+  .slot.done { background:#1a7f4b; color:#fff; }
+  .slot .tm { display:block; font-size:10px; font-weight:400; opacity:.85; }
+  .mini { background:none; border:none; color:#c0392b; font-size:12px; cursor:pointer; padding:4px; }
+  .tabs { display:flex; gap:6px; margin:12px 0 2px; }
+  .tab { flex:1; text-align:center; padding:9px; border-radius:9px; background:#eef1f4; color:#6a737d; font-size:14px; cursor:pointer; }
+  .tab.on { background:#1a7f4b; color:#fff; font-weight:600; }
+  .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-top:8px; }
+  .cal .c { aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:8px; font-size:12px; background:#f2f4f7; color:#6a737d; position:relative; }
+  .cal .c.hd { background:none; font-weight:600; color:#24292f; }
+  .cal .c.g { background:#e8f5ee; color:#1a7f4b; font-weight:600; }
+  .cal .c.y { background:#fdf3e0; color:#b9770e; font-weight:600; }
+  .cal .c.r { background:#fdecec; color:#c0392b; font-weight:600; }
+  .cal .c.tdy { outline:2px solid #1a7f4b; }
+  .mnav { display:flex; align-items:center; justify-content:space-between; margin-top:14px; }
+  .mnav b { font-size:15px; }
+  .mnav button { border:none; background:#eef1f4; border-radius:8px; padding:7px 14px; font-size:14px; cursor:pointer; }
+  .banner { background:#c0392b; color:#fff; border-radius:12px; padding:11px 14px; font-size:14px; font-weight:600; margin-top:12px; display:none; }
+  .stat { display:flex; gap:8px; margin-top:10px; }
+  .stat > div { flex:1; background:#f7f9fa; border-radius:10px; padding:10px; text-align:center; }
+  .stat b { font-size:20px; color:#1a7f4b; }
+  .stat span { display:block; font-size:11px; color:#6a737d; margin-top:2px; }
+  .urow { display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid #eef1f4; cursor:pointer; }
+  .urow:last-child { border-bottom:none; }
+  .urow .un { font-weight:600; }
+  .urow .up { font-size:12px; color:#6a737d; margin-top:2px; }
+  .pill { font-size:12px; padding:4px 10px; border-radius:20px; font-weight:600; }
+  .pill.g { background:#e8f5ee; color:#1a7f4b; }
+  .pill.r { background:#fdecec; color:#c0392b; }
+  .pill.off { background:#eef1f4; color:#888; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:flex-end; justify-content:center; z-index:50; }
+  .modal .box { background:#fff; border-radius:18px 18px 0 0; width:100%; max-width:480px; padding:18px 16px 30px; max-height:88vh; overflow:auto; }
+  .modal h3 { font-size:16px; margin-bottom:4px; }
+  .det { font-size:12px; color:#6a737d; margin-top:8px; line-height:1.7; }
+  .sw { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+  .sw input { display:none; }
+  .sw i { position:absolute; inset:0; background:#d5dae0; border-radius:20px; transition:.2s; cursor:pointer; }
+  .sw i:before { content:""; position:absolute; width:18px; height:18px; border-radius:50%; background:#fff; top:3px; left:3px; transition:.2s; }
+  .sw input:checked + i { background:#1a7f4b; }
+  .sw input:checked + i:before { transform:translateX(20px); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 登录/注册 -->
+  <div id="view-auth" class="hide">
+    <h1 style="margin-top:30px;text-align:center;">每日打卡</h1>
+    <p style="text-align:center;font-size:13px;color:#6a737d;margin-top:6px;">坚持每日打卡，健康看得见</p>
+    <div class="tabs">
+      <div class="tab on" id="tab-login" onclick="authTab('login')">登录</div>
+      <div class="tab" id="tab-reg" onclick="authTab('reg')">注册</div>
+    </div>
+    <div class="card">
+      <div id="reg-fields" class="hide">
+        <label>姓名</label>
+        <input id="r-name" placeholder="怎么称呼你">
+        <label>手机号（作为账号，仅管理员可见）</label>
+        <input id="r-phone" type="tel" maxlength="11" placeholder="11位手机号" inputmode="numeric">
+      </div>
+      <label id="l-phone">手机号</label>
+      <input id="a-phone" type="tel" maxlength="11" placeholder="11位手机号" inputmode="numeric">
+      <label>密码</label>
+      <input id="a-pass" type="password" placeholder="至少6位">
+      <button class="btn btn-p" id="btn-auth" style="margin-top:16px;" onclick="doAuth()">登 录</button>
+      <div id="auth-msg"></div>
+    </div>
+  </div>
+
+  <!-- 主界面 -->
+  <div id="view-app" class="hide">
+    <div class="hdr">
+      <h1>每日打卡</h1>
+      <div>
+        <button class="lk" id="lk-admin" onclick="showAdmin()" style="display:none;">管理端</button>
+        <button class="lk" onclick="logout()">退出</button>
+      </div>
+    </div>
+    <div class="who" id="who"></div>
+    <div class="banner" id="remind-banner"></div>
+
+    <div id="sec-client">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b id="today-title">今日打卡</b>
+          <span style="font-size:12px;color:#6a737d;" id="today-date"></span>
+        </div>
+        <div id="today-list"></div>
+        <button class="btn btn-s" style="margin-top:12px;" onclick="openAddItem()">＋ 添加品类</button>
+      </div>
+
+      <div class="card">
+        <div class="mnav">
+          <button onclick="calNav(-1)">‹ 上月</button>
+          <b id="cal-title"></b>
+          <button onclick="calNav(1)">下月 ›</button>
+        </div>
+        <div class="cal" id="cal"></div>
+        <div class="stat">
+          <div><b id="st-streak">0</b><span>连续打卡(天)</span></div>
+          <div><b id="st-month">0%</b><span>本月完卡率</span></div>
+          <div><b id="st-cnt">0</b><span>本月打卡次数</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 管理端 -->
+    <div id="sec-admin" class="hide">
+      <div class="tabs">
+        <div class="tab on" id="atab-ov" onclick="adminTab('ov')">今日总览</div>
+        <div class="tab" id="atab-st" onclick="adminTab('st')">数据统计</div>
+      </div>
+      <div class="card" id="admin-ov">
+        <div class="mnav">
+          <button onclick="ovNav(-1)">‹ 前一天</button>
+          <b id="ov-date"></b>
+          <button onclick="ovNav(1)">后一天 ›</button>
+        </div>
+        <div style="margin-top:6px;font-size:12px;color:#6a737d;">点任意客户查看详情 / 补卡</div>
+        <div id="ov-list"></div>
+      </div>
+      <div class="card hide" id="admin-st">
+        <div class="mnav">
+          <button onclick="stNav(-1)">‹ 上月</button>
+          <b id="st-title"></b>
+          <button onclick="stNav(1)">下月 ›</button>
+        </div>
+        <div id="st-list"></div>
+        <button class="btn btn-s" style="margin-top:12px;" onclick="exportCsv()">导出本月明细 (CSV)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 弹层 -->
+<div id="modal" class="modal hide" onclick="if(event.target===this)closeModal()">
+  <div class="box" id="modal-box"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* ================== 配置（部署时填入） ================== */
+const SUPABASE_URL = "__SUPABASE_URL__";
+const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+/* ======================================================== */
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const TZ = 'Asia/Shanghai';
+const $ = id => document.getElementById(id);
+let ME = null, ITEMS = [], TODAY_CK = [], CAL_M = new Date(), OV_D = new Date(), ST_M = new Date();
+let ADMIN_TARGET = null, REMIND_TIMER = null;
+
+function todayStr(d) {
+  d = d || new Date();
+  return new Date(d.getTime() + (new Date().getTimezoneOffset() * 60000) + 0).toLocaleDateString('sv-SE', { timeZone: TZ });
+}
+function fmtDT(iso) {
+  return new Date(iso).toLocaleString('zh-CN', { timeZone: TZ, month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false });
+}
+function nowTime() { return new Date().toLocaleTimeString('zh-CN', { timeZone: TZ, hour:'2-digit', minute:'2-digit', hour12:false }); }
+function fmtD(d) { return d.toLocaleDateString('sv-SE', { timeZone: TZ }); }
+function msg(el, text, err) { $(el).innerHTML = '<div class="msg ' + (err ? 'msg-err' : 'msg-ok') + '">' + text + '</div>'; if (!err) setTimeout(() => $(el).innerHTML = '', 2500); }
+
+/* ================== 认证 ================== */
+let authMode = 'login';
+function authTab(m) {
+  authMode = m;
+  $('tab-login').className = 'tab' + (m === 'login' ? ' on' : '');
+  $('tab-reg').className = 'tab' + (m === 'reg' ? ' on' : '');
+  $('reg-fields').className = m === 'reg' ? '' : 'hide';
+  $('l-phone').style.display = m === 'reg' ? 'none' : 'block';
+  $('a-phone').style.display = m === 'reg' ? 'none' : 'block';
+  $('btn-auth').textContent = m === 'login' ? '登 录' : '注 册';
+  $('auth-msg').innerHTML = '';
+}
+async function doAuth() {
+  $('btn-auth').disabled = true;
+  try {
+    const pass = $('a-pass').value.trim();
+    if (pass.length < 6) throw new Error('密码至少6位');
+    if (authMode === 'reg') {
+      const name = $('r-name').value.trim(), phone = $('r-phone').value.trim();
+      if (!name) throw new Error('请填写姓名');
+      if (!/^1\d{10}$/.test(phone)) throw new Error('手机号格式不对');
+      const { error } = await sb.auth.signUp({
+        email: phone + '@daka.user', password: pass,
+        options: { data: { name: name, phone: phone } }
+      });
+      if (error) throw error;
+      msg('auth-msg', '注册成功！已自动登录');
+      await afterAuth();
+    } else {
+      const phone = $('a-phone').value.trim();
+      if (!/^1\d{10}$/.test(phone)) throw new Error('手机号格式不对');
+      const { error } = await sb.auth.signInWithPassword({ email: phone + '@daka.user', password: pass });
+      if (error) throw error;
+      await afterAuth();
+    }
+  } catch (e) { msg('auth-msg', e.message, true); }
+  $('btn-auth').disabled = false;
+}
+async function afterAuth() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  const { data: p, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  if (error) { alert('读取用户信息失败：' + error.message); await sb.auth.signOut(); return; }
+  if (!p.active) { await sb.auth.signOut(); $('view-app').classList.add('hide'); $('view-auth').classList.remove('hide'); msg('auth-msg', '账号已被停用，请联系管理员', true); return; }
+  ME = p;
+  $('view-auth').classList.add('hide');
+  $('view-app').classList.remove('hide');
+  $('who').textContent = '你好，' + ME.name;
+  $('lk-admin').style.display = ME.is_admin ? 'inline' : 'none';
+  $('sec-admin').classList.add('hide');
+  $('sec-client').classList.remove('hide');
+  await loadClient();
+  startRemind();
+}
+async function logout() { await sb.auth.signOut(); location.reload(); }
+
+/* ================== 客户端 ================== */
+async function loadClient() {
+  const { data: items } = await sb.from('items').select('*').eq('user_id', ME.id).order('created_at');
+  ITEMS = items || [];
+  const { data: cks } = await sb.from('checkins').select('*').eq('user_id', ME.id).eq('check_date', todayStr());
+  TODAY_CK = cks || [];
+  renderToday();
+  renderCal();
+}
+function renderToday() {
+  $('today-date').textContent = todayStr() + ' ' + ['周日','周一','周二','周三','周四','周五','周六'][new Date().getDay()];
+  const el = $('today-list');
+  if (!ITEMS.length) { el.innerHTML = '<div style="padding:16px 0;text-align:center;color:#6a737d;font-size:13px;">还没有品类，点下方「添加品类」开始</div>'; return; }
+  el.innerHTML = ITEMS.map(it => {
+    const slots = [];
+    for (let s = 1; s <= it.times_per_day; s++) {
+      const ck = TODAY_CK.find(c => c.item_id === it.id && c.slot === s);
+      slots.push(ck
+        ? '<button class="slot done">第' + s + '次 ✓<span class="tm">' + fmtDT(ck.created_at).slice(-5) + (ck.is_admin_backfill ? ' 补' : '') + '</span></button>'
+        : '<button class="slot" onclick="checkin(\'' + it.id + '\',' + s + ')">第' + s + '次</button>');
+    }
+    return '<div class="item"><div><div class="nm">' + esc(it.name) + '</div><div class="ds">每天' + it.times_per_day + '次 × ' + esc(it.dose) + (it.remind_time ? ' · 提醒 ' + it.remind_time : '') + '</div></div>'
+      + '<div style="display:flex;gap:6px;align-items:center;">' + slots.join('') + '<button class="mini" onclick="itemMenu(\'' + it.id + '\')">⋯</button></div></div>';
+  }).join('');
+}
+async function checkin(itemId, slot) {
+  const it = ITEMS.find(i => i.id === itemId);
+  const { error } = await sb.from('checkins').insert({ user_id: ME.id, item_id: itemId, check_date: todayStr(), slot: slot, dose: it.dose });
+  if (error) { alert('打卡失败：' + error.message); return; }
+  await loadClient();
+}
+async function undoCk(ckId) {
+  if (!confirm('撤销这条打卡？')) return;
+  const { error } = await sb.from('checkins').delete().eq('id', ckId);
+  if (error) { alert('撤销失败（管理员补录的记录无法自行撤销）：' + error.message); return; }
+  await loadClient(); closeModal();
+}
+function itemMenu(itemId) {
+  const it = ITEMS.find(i => i.id === itemId);
+  openModal('<h3>' + esc(it.name) + '</h3>'
+    + '<label>名称</label><input id="e-name" value="' + esc(it.name) + '">'
+    + '<div class="row"><div><label>每天几次</label><input id="e-times" type="number" min="1" max="9" value="' + it.times_per_day + '"></div>'
+    + '<div><label>每次剂量</label><input id="e-dose" value="' + esc(it.dose) + '"></div></div>'
+    + '<label>每日提醒时间（可选）</label><input id="e-remind" type="time" value="' + (it.remind_time || '') + '">'
+    + '<button class="btn btn-p" style="margin-top:14px;" onclick="saveItem(\'' + it.id + '\')">保存修改</button>'
+    + '<button class="btn btn-d" style="margin-top:8px;" onclick="delItem(\'' + it.id + '\')">删除品类（打卡记录一并删除）</button>'
+    + '<div style="margin-top:10px;"><b style="font-size:13px;">今日已打卡明细：</b><div class="det" id="e-cks"></div></div>');
+  const cks = TODAY_CK.filter(c => c.item_id === it.id);
+  $('e-cks').innerHTML = cks.length ? cks.map(c => '第' + c.slot + '次 · ' + fmtDT(c.created_at) + (c.is_admin_backfill ? '（管理员补录）' : '') + ' <button class="mini" onclick="undoCk(\'' + c.id + '\')">撤销</button>').join('<br>') : '今日暂无';
+}
+async function saveItem(id) {
+  const { error } = await sb.from('items').update({
+    name: $('e-name').value.trim(), times_per_day: parseInt($('e-times').value) || 1,
+    dose: $('e-dose').value.trim() || '1粒', remind_time: $('e-remind').value || null
+  }).eq('id', id);
+  if (error) { alert('保存失败：' + error.message); return; }
+  closeModal(); await loadClient();
+}
+async function delItem(id) {
+  if (!confirm('确定删除该品类及其所有打卡记录？')) return;
+  await sb.from('items').delete().eq('id', id);
+  closeModal(); await loadClient();
+}
+function openAddItem() {
+  openModal('<h3>添加品类</h3>'
+    + '<label>名称（如：人参压片糖果）</label><input id="n-name" placeholder="要打卡的东西">'
+    + '<div class="row"><div><label>每天几次</label><input id="n-times" type="number" min="1" max="9" value="1"></div>'
+    + '<div><label>每次剂量</label><input id="n-dose" value="1粒"></div></div>'
+    + '<label>每日提醒时间（可选）</label><input id="n-remind" type="time" value="08:00">'
+    + '<button class="btn btn-p" style="margin-top:14px;" onclick="addItem()">添加</button>');
+}
+async function addItem() {
+  const name = $('n-name').value.trim();
+  if (!name) { alert('请填写名称'); return; }
+  const { error } = await sb.from('items').insert({
+    user_id: ME.id, name: name, times_per_day: parseInt($('n-times').value) || 1,
+    dose: $('n-dose').value.trim() || '1粒', remind_time: $('n-remind').value || null
+  });
+  if (error) { alert('添加失败：' + error.message); return; }
+  closeModal(); await loadClient();
+}
+
+/* ---- 日历与统计 ---- */
+function calNav(d) { CAL_M.setMonth(CAL_M.getMonth() + d); renderCal(); }
+async function renderCal() {
+  const y = CAL_M.getFullYear(), m = CAL_M.getMonth();
+  $('cal-title').textContent = y + '年' + (m + 1) + '月';
+  const start = fmtD(new Date(y, m, 1)), end = fmtD(new Date(y, m + 1, 0));
+  const { data: cks } = await sb.from('checkins').select('*').eq('user_id', ME.id).gte('check_date', start).lte('check_date', end);
+  const ck = cks || [];
+  const totalPerDay = ITEMS.reduce((s, i) => s + i.times_per_day, 0);
+  const t = todayStr();
+  let html = ['日','一','二','三','四','五','六'].map(w => '<div class="c hd">' + w + '</div>').join('');
+  const first = new Date(y, m, 1).getDay();
+  for (let i = 0; i < first; i++) html += '<div class="c"></div>';
+  const days = new Date(y, m + 1, 0).getDate();
+  let doneCnt = 0, monthDone = 0, monthTotal = 0;
+  for (let d = 1; d <= days; d++) {
+    const ds = fmtD(new Date(y, m, d));
+    const dayCk = ck.filter(c => c.check_date === ds);
+    const cls = dayCk.length === 0 ? '' : (dayCk.length >= totalPerDay ? 'g' : 'y');
+    if (ds <= t && totalPerDay > 0) { monthDone += dayCk.length; monthTotal += totalPerDay; }
+    if (ds === t) html += '<div class="c ' + cls + ' tdy">' + d + '</div>';
+    else html += '<div class="c ' + cls + '">' + d + '</div>';
+  }
+  $('cal').innerHTML = html;
+  // 连续打卡：从今天（或昨天）往前数全打的天数
+  let streak = 0;
+  const daySet = new Set(ck.map(c => c.check_date));
+  let cur = new Date();
+  if (totalPerDay > 0) {
+    if (!daySet.has(todayStr())) cur.setDate(cur.getDate() - 1);
+    while (true) {
+      let ok = true;
+      for (let s = 0; s < totalPerDay; s++) { /* 全打判断按记录数 */ }
+      if (!daySet.has(fmtD(cur)) || fmtD(cur) > t) break;
+      const dcks = ck.filter(c => c.check_date === fmtD(cur));
+      if (dcks.length < totalPerDay) break;
+      streak++; cur.setDate(cur.getDate() - 1);
+    }
+  }
+  $('st-streak').textContent = streak;
+  $('st-month').textContent = monthTotal ? Math.round(monthDone / monthTotal * 100) + '%' : '—';
+  $('st-cnt').textContent = monthDone;
+}
+
+/* ---- 页面内提醒 ---- */
+function startRemind() {
+  if (REMIND_TIMER) clearInterval(REMIND_TIMER);
+  if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  REMIND_TIMER = setInterval(() => {
+    const now = nowTime();
+    const due = ITEMS.filter(it => it.remind_time && it.remind_time <= now);
+    const undone = [];
+    due.forEach(it => { for (let s = 1; s <= it.times_per_day; s++) if (!TODAY_CK.find(c => c.item_id === it.id && c.slot === s)) undone.push(it.name); });
+    const b = $('remind-banner');
+    if (undone.length) {
+      b.style.display = 'block';
+      b.textContent = '⏰ 提醒：' + [...new Set(undone)].join('、') + ' 今日还没打完卡';
+      if ('Notification' in window && Notification.permission === 'granted') {
+        if (!b.dataset.n || b.dataset.n !== now) {
+          b.dataset.n = now;
+          try { new Notification('每日打卡提醒', { body: undone.join('、') + '还没打完卡' }); } catch (e) {}
+        }
+      }
+    } else b.style.display = 'none';
+  }, 30000);
+}
+
+/* ================== 管理端 ================== */
+function showAdmin() {
+  $('sec-client').classList.add('hide');
+  $('sec-admin').classList.remove('hide');
+  adminTab('ov');
+}
+function adminTab(t) {
+  $('atab-ov').className = 'tab' + (t === 'ov' ? ' on' : '');
+  $('atab-st').className = 'tab' + (t === 'st' ? ' on' : '');
+  $('admin-ov').classList.toggle('hide', t !== 'ov');
+  $('admin-st').classList.toggle('hide', t !== 'st');
+  if (t === 'ov') renderOverview(); else renderStats();
+}
+async function renderOverview() {
+  $('ov-date').textContent = fmtD(OV_D);
+  const [{ data: users }, { data: cks }, { data: allItems }] = await Promise.all([
+    sb.from('profiles').select('*').order('created_at'),
+    sb.from('checkins').select('*').eq('check_date', fmtD(OV_D)),
+    sb.from('items').select('*')
+  ]);
+  const el = $('ov-list');
+  el.innerHTML = (users || []).map(u => {
+    const its = (allItems || []).filter(i => i.user_id === u.id);
+    const total = its.reduce((s, i) => s + i.times_per_day, 0);
+    const done = (cks || []).filter(c => c.user_id === u.id).length;
+    const pill = !u.active ? '<span class="pill off">已停用</span>'
+      : (total === 0 ? '<span class="pill off">无品类</span>'
+      : (done >= total ? '<span class="pill g">全打 ' + done + '/' + total + '</span>' : '<span class="pill r">' + done + '/' + total + '</span>'));
+    return '<div class="urow" onclick="userDetail(\'' + u.id + '\')"><div><div class="un">' + esc(u.name) + (u.is_admin ? ' （我）' : '') + '</div><div class="up">' + u.phone + '</div></div>' + pill + '</div>';
+  }).join('') || '<div style="padding:14px;text-align:center;color:#6a737d;font-size:13px;">暂无用户</div>';
+}
+function ovNav(d) { OV_D.setDate(OV_D.getDate() + d); renderOverview(); }
+
+async function userDetail(uid) {
+  ADMIN_TARGET = uid;
+  const [{ data: u }, { data: its }, { data: cks }] = await Promise.all([
+    sb.from('profiles').select('*').eq('id', uid).single(),
+    sb.from('items').select('*').eq('user_id', uid).order('created_at'),
+    sb.from('checkins').select('*').eq('user_id', uid).gte('check_date', fmtD(new Date(new Date().getFullYear(), new Date().getMonth(), 1))).lte('check_date', todayStr())
+  ]);
+  const monthCks = cks || [];
+  const doneThisMonth = monthCks.length;
+  const totalPerDay = its.reduce((s, i) => s + i.times_per_day, 0);
+  const daysSoFar = new Date().getDate();
+  const rate = totalPerDay ? Math.min(100, Math.round(doneThisMonth / (totalPerDay * daysSoFar) * 100)) : 0;
+  openModal('<h3>' + esc(u.name) + ' <span style="font-size:12px;color:#6a737d;font-weight:400;">' + u.phone + (u.active ? '' : ' · 已停用') + '</span></h3>'
+    + '<div class="stat"><div><b>' + rate + '%</b><span>本月完卡率</span></div><div><b>' + doneThisMonth + '</b><span>本月打卡次数</span></div></div>'
+    + '<label style="margin-top:14px;">补卡（仅管理员可用）</label>'
+    + '<select id="bf-item">' + its.map(i => '<option value="' + i.id + '" data-dose="' + esc(i.dose) + '" data-times="' + i.times_per_day + '">' + esc(i.name) + '（每天' + i.times_per_day + '次）</option>').join('') + '</select>'
+    + '<div class="row"><div><label>日期</label><input id="bf-date" type="date" value="' + todayStr() + '"></div>'
+    + '<div><label>第几次</label><input id="bf-slot" type="number" min="1" max="9" value="1"></div></div>'
+    + '<label>补卡原因（可选）</label><input id="bf-reason" placeholder="如：出差忘带">'
+    + '<button class="btn btn-p" style="margin-top:12px;" onclick="doBackfill()">确认补卡</button>'
+    + '<div class="msg" style="display:none" id="bf-msg"></div>'
+    + '<div style="margin-top:16px;"><b style="font-size:13px;">最近记录（本月 ' + doneThisMonth + ' 条）</b><div class="det">' + monthCks.slice().reverse().slice(0, 15).map(c => fmtD(new Date(c.check_date)) + ' 第' + c.slot + '次' + (c.is_admin_backfill ? ' · 补录' + (c.backfill_reason ? '：' + esc(c.backfill_reason) : '') : '')).join('<br>') + '</div></div>'
+    + '<div class="row" style="margin-top:14px;">'
+    + '<button class="btn btn-s" onclick="resetPwd(\'' + uid + '\')">重置密码</button>'
+    + '<button class="btn ' + (u.active ? 'btn-d' : 'btn-s') + '" onclick="toggleActive(\'' + uid + '\',' + u.active + ')">' + (u.active ? '停用账号' : '启用账号') + '</button></div>');
+}
+async function doBackfill() {
+  const sel = $('bf-item');
+  const item = sel.options[sel.selectedIndex];
+  const { error } = await sb.from('checkins').insert({
+    user_id: ADMIN_TARGET, item_id: sel.value,
+    check_date: $('bf-date').value, slot: parseInt($('bf-slot').value) || 1,
+    dose: item.dataset.dose, is_admin_backfill: true, backfill_reason: $('bf-reason').value.trim() || null
+  });
+  const bm = $('bf-msg');
+  bm.style.display = 'block';
+  if (error) { bm.className = 'msg msg-err'; bm.textContent = '补卡失败：' + error.message; }
+  else { bm.className = 'msg msg-ok'; bm.textContent = '补卡成功'; renderOverview(); }
+}
+async function resetPwd(uid) {
+  const np = prompt('输入新密码（至少6位）：');
+  if (!np) return;
+  const { error } = await sb.rpc('admin_reset_password', { target_user_id: uid, new_password: np });
+  alert(error ? '重置失败：' + error.message : '密码已重置为：' + np);
+}
+async function toggleActive(uid, cur) {
+  const { error } = await sb.from('profiles').update({ active: !cur }).eq('id', uid);
+  if (error) { alert('操作失败：' + error.message); return; }
+  closeModal(); renderOverview();
+}
+
+/* ---- 统计与导出 ---- */
+function stNav(d) { ST_M.setMonth(ST_M.getMonth() + d); renderStats(); }
+async function renderStats() {
+  const y = ST_M.getFullYear(), m = ST_M.getMonth();
+  $('st-title').textContent = y + '年' + (m + 1) + '月';
+  const [{ data: users }, { data: cks }, { data: allItems }] = await Promise.all([
+    sb.from('profiles').select('*'),
+    sb.from('checkins').select('*').gte('check_date', fmtD(new Date(y, m, 1))).lte('check_date', fmtD(new Date(y, m + 1, 0))),
+    sb.from('items').select('*')
+  ]);
+  const el = $('st-list');
+  el.innerHTML = (users || []).map(u => {
+    const its = (allItems || []).filter(i => i.user_id === u.id);
+    const total = its.reduce((s, i) => s + i.times_per_day, 0);
+    const mine = (cks || []).filter(c => c.user_id === u.id);
+    const daysSoFar = (y === new Date().getFullYear() && m === new Date().getMonth()) ? new Date().getDate() : new Date(y, m + 1, 0).getDate();
+    const rate = total ? Math.min(100, Math.round(mine.length / (total * daysSoFar) * 100)) : 0;
+    return '<div class="urow"><div><div class="un">' + esc(u.name) + '</div><div class="up">本月 ' + mine.length + ' 次 · ' + mine.filter(c => c.is_admin_backfill).length + ' 次补录</div></div><span class="pill ' + (rate >= 80 ? 'g' : rate >= 50 ? 'y' : 'r') + '" style="background:' + (rate >= 80 ? '' : rate >= 50 ? '#fdf3e0;color:#b9770e' : '') + '">' + rate + '%</span></div>';
+  }).join('');
+}
+async function exportCsv() {
+  const y = ST_M.getFullYear(), m = ST_M.getMonth();
+  const [{ data: users }, { data: cks }, { data: allItems }] = await Promise.all([
+    sb.from('profiles').select('*'),
+    sb.from('checkins').select('*').gte('check_date', fmtD(new Date(y, m, 1))).lte('check_date', fmtD(new Date(y, m + 1, 0))),
+    sb.from('items').select('*')
+  ]);
+  const uMap = {}, iMap = {};
+  (users || []).forEach(u => uMap[u.id] = u);
+  (allItems || []).forEach(i => iMap[i.id] = i);
+  let csv = '\ufeff日期,姓名,手机号,品类,第几次,剂量,打卡时间,类型,原因\n';
+  (cks || []).slice().sort((a, b) => a.check_date < b.check_date ? -1 : 1).forEach(c => {
+    const u = uMap[c.user_id] || {}, i = iMap[c.item_id] || {};
+    csv += [c.check_date, u.name || '', u.phone || '', i.name || '', c.slot, c.dose || '', fmtDT(c.created_at), c.is_admin_backfill ? '管理员补录' : '本人打卡', c.backfill_reason || ''].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',') + '\n';
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = '打卡明细_' + y + '-' + (m + 1) + '.csv';
+  a.click();
+}
+
+/* ================== 通用 ================== */
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+function openModal(html) { $('modal-box').innerHTML = html; $('modal').classList.remove('hide'); }
+function closeModal() { $('modal').classList.add('hide'); }
+
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) { await afterAuth(); return; }
+  $('view-auth').classList.remove('hide');
+  authTab('login');
+}
+sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') location.reload(); });
+boot();
+</script>
+</body>
+</html>
